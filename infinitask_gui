@@ -7,7 +7,13 @@ import json
 from typing import List, Any
 
 main_window = Tk()
-
+login_window = Toplevel(main_window)
+login_window.attributes("-topmost", True)
+# create useful vars for log in window
+gui_username = StringVar()
+gui_password = StringVar()
+global valid_login
+valid_login = False
 # create tkinter gui vars
 gui_descr = StringVar()
 gui_worker = StringVar()
@@ -17,8 +23,9 @@ gui_search = StringVar()
 list_sort_dropdown = ["Job #", "Job Description", "Worker"]
 gui_sort = StringVar()
 
+scroll_bar = Scrollbar(main_window, orient=VERTICAL)
 # create connection to DB
-db_conn = sqlite3.connect('DB filepath')
+db_conn = sqlite3.connect('db file path')
 cursor = db_conn.cursor()
 
 
@@ -93,7 +100,7 @@ def enter_new_worker():
 def on_click_new_search():
     # get gui vars and query the DB for any entries that contain the search
     new_search = gui_search.get()
-    sql_query = "SELECT * FROM Job WHERE Descr LIKE '%"+new_search+"%';"
+    sql_query = "SELECT * FROM Job WHERE Descr LIKE '%" + new_search + "%';"
     cursor.execute(sql_query)
     search_result = cursor.fetchall()
 
@@ -133,7 +140,7 @@ def on_click_new_sort():
         new_sort = "JobID"
 
     # query the DB, sort the results
-    sql_query = "SELECT * FROM Job ORDER BY "+new_sort+" ASC;"
+    sql_query = "SELECT * FROM Job ORDER BY " + new_sort + " ASC;"
     cursor.execute(sql_query)
     sort_result = cursor.fetchall()
 
@@ -155,6 +162,32 @@ def on_click_new_sort():
             if sort_row[2] == worker_row[0]:
                 disp_jobs.insert('end', worker_row[1])
                 disp_jobs.insert('end', "\n")
+
+
+# user has clicked the login button
+# sets valid_login True if log in is valid, False if log in is invalid. informs user
+# that their log in was invalid
+def on_click_login():
+    global valid_login
+    username = gui_username.get()
+    password = gui_password.get()
+
+    sql_query = "SELECT Password FROM Login WHERE Username = \"" + username + "\";"
+    cursor.execute(sql_query)
+    password_result = cursor.fetchone()
+    if password_result is not None:
+        password_result_edit = "".join(x for x in password_result if x.isalpha())
+
+        if password_result_edit == password:
+            valid_login = "True"
+    else:
+        valid_login = "False"
+        invalid_login_window = Tk()
+        invalid_login_window.attributes("-topmost", True)
+        Label(invalid_login_window, text="Invalid Log In").pack()
+        Button(invalid_login_window, text="OK", command=invalid_login_window.destroy).pack()
+        invalid_login_window.mainloop()
+    main()
 
 
 # user hits the refresh button, restore the page to the "home" page
@@ -181,29 +214,49 @@ def on_click_refresh():
                 disp_jobs.insert('end', "\n")
 
 
-# create a scroll bar
-scroll_bar = Scrollbar(main_window, orient=VERTICAL)
-scroll_bar.grid(row=1, column=1, sticky=NS)
+def main():
+    # create a scroll bar
+    scroll_bar.grid(row=1, column=1, sticky=NS)
 
-# basic UI elements
-Label(main_window, text="InfiniTask", justify=LEFT, anchor="w", font="bold", fg="blue").grid(sticky=W, row=0, column=0,
-                                                                                             columnspan=1)
-# display jobs in db here
-on_click_refresh()
+    # create a log in window
+    Label(login_window, text="InfiniTask Log In", justify=LEFT, anchor="w", font="bold", fg="blue").grid(sticky=W,
+                                                                                                         row=0,
+                                                                                                         column=0,
+                                                                                                         columnspan=1)
+    Label(login_window, text="User Name").grid(sticky=W, row=2, column=0,
+                                               columnspan=1)
+    Entry(login_window, width=75, textvariable=gui_username).grid(row=2, column=1, columnspan=2)
+    Label(login_window, text="Password").grid(sticky=W, row=3, column=0,
+                                              columnspan=1)
+    Entry(login_window, width=75, textvariable=gui_password, show="*").grid(row=3, column=1, columnspan=2)
+    Button(login_window, text="Log In", command=on_click_login, anchor="center").grid(row=4, column=0,
+                                                                                      columnspan=2)
+    # user logged in with a valid password and username. display the rest of the application
+    if valid_login:
+        login_window.destroy()
+        Label(main_window, text="InfiniTask", justify=LEFT, anchor="w", font="bold", fg="blue").grid(sticky=W, row=0,
+                                                                                                     column=0,
+                                                                                                     columnspan=1)
+        # display functionality widgets at bottom of page
+        Button(main_window, text="Enter New Job", command=on_click_new_job, anchor=W).grid(sticky=W, row=2, column=0,
+                                                                                           columnspan=2)
+        Button(main_window, text="Enter New Worker", command=on_click_new_worker, anchor=W).grid(sticky=W, row=3,
+                                                                                                 column=0,
+                                                                                                 columnspan=2)
+        Button(main_window, text="Search", command=on_click_new_search, anchor=W).grid(sticky=N, row=2,
+                                                                                       column=0, columnspan=2)
+        Button(main_window, text="Sort By", command=on_click_new_sort, anchor=W).grid(sticky=N, row=3,
+                                                                                      column=0,
+                                                                                      columnspan=2)
+        Entry(main_window, width=50, textvariable=gui_search).grid(sticky=E, row=2, column=0, columnspan=2)
+        OptionMenu(main_window, gui_sort, *list_sort_dropdown).grid(sticky=E, row=3, column=0, columnspan=2)
+        # button to refresh page
+        Button(main_window, text="Refresh", command=on_click_refresh, justify=RIGHT, anchor="e").grid(row=0, column=0,
+                                                                                                      columnspan=2)
+        on_click_refresh()
+        main_window.mainloop()
+    else:
+        login_window.mainloop()
 
-# display functionality widgets at bottom of page
-Button(main_window, text="Enter New Job", command=on_click_new_job, anchor=W).grid(sticky=W, row=2, column=0,
-                                                                                   columnspan=2)
-Button(main_window, text="Enter New Worker", command=on_click_new_worker, anchor=W).grid(sticky=W, row=3, column=0,
-                                                                                         columnspan=2)
-Button(main_window, text="Search", command=on_click_new_search, anchor=W).grid(sticky=N, row=2,
-                                                                               column=0, columnspan=2)
-Button(main_window, text="Sort By", command=on_click_new_sort, anchor=W).grid(sticky=N, row=3,
-                                                                              column=0,
-                                                                              columnspan=2)
-Entry(main_window, width=50, textvariable=gui_search).grid(sticky=E, row=2, column=0, columnspan=2)
-OptionMenu(main_window, gui_sort, *list_sort_dropdown).grid(sticky=E, row=3, column=0, columnspan=2)
-# button to refresh page
-Button(main_window, text="Refresh", command=on_click_refresh, justify=RIGHT, anchor="e").grid(row=0, column=0,
-                                                                                              columnspan=2)
-main_window.mainloop()
+
+main()
