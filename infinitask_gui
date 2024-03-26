@@ -14,6 +14,8 @@ gui_username = StringVar()
 gui_password = StringVar()
 global valid_login
 valid_login = False
+global user_role
+user_role = 1
 # create tkinter gui vars
 gui_descr = StringVar()
 gui_worker = StringVar()
@@ -135,33 +137,28 @@ def on_click_new_sort():
     elif new_sort == "Job Description":
         new_sort = "Descr"
     elif new_sort == "Worker":
-        new_sort = "WorkerID"
+        new_sort = "Name"
     elif new_sort == "":
         new_sort = "JobID"
 
-    # query the DB, sort the results
-    sql_query = "SELECT * FROM Job ORDER BY " + new_sort + " ASC;"
+    # query the DB, sort the results. search through worker table for worker name
+    sql_query = ("SELECT JobID, Descr, Name from Job INNER JOIN Worker on Worker.WorkerID = Job.WorkerID ORDER BY "
+                 + new_sort + " ASC;")
     cursor.execute(sql_query)
     sort_result = cursor.fetchall()
-
     # display the results
     disp_jobs = tk.Text(main_window)
     disp_jobs.config(yscrollcommand=scroll_bar.set)
     scroll_bar.config(command=disp_jobs.yview)
     disp_jobs.grid(row=1, column=0)
 
-    cursor.execute("SELECT * FROM Worker")
-    worker_result = cursor.fetchall()
-
     for sort_row in sort_result:
         disp_jobs.insert('end', sort_row[0])
         disp_jobs.insert('end', "\t")
         disp_jobs.insert('end', sort_row[1])
         disp_jobs.insert('end', "\t\t\t\t\t\t\t")
-        for worker_row in worker_result:
-            if sort_row[2] == worker_row[0]:
-                disp_jobs.insert('end', worker_row[1])
-                disp_jobs.insert('end', "\n")
+        disp_jobs.insert('end', sort_row[2])
+        disp_jobs.insert('end', "\n")
 
 
 # user has clicked the login button
@@ -169,19 +166,23 @@ def on_click_new_sort():
 # that their log in was invalid
 def on_click_login():
     global valid_login
+    global user_role
     username = gui_username.get()
     password = gui_password.get()
 
-    sql_query = "SELECT Password FROM Login WHERE Username = \"" + username + "\";"
+    sql_query = "SELECT Password, Role FROM Login WHERE Username = \"" + username + "\";"
     cursor.execute(sql_query)
-    password_result = cursor.fetchone()
-    if password_result is not None:
-        password_result_edit = "".join(x for x in password_result if x.isalpha())
+    query_result = cursor.fetchall()
+    password_result = query_result[0][0]
+    role_result = query_result[0][1]
+    if query_result is not None:
+        query_result_edit = "".join(x for x in password_result if x.isalpha())
 
-        if password_result_edit == password:
-            valid_login = "True"
+        if query_result_edit == password:
+            valid_login = True
+            user_role = role_result
     else:
-        valid_login = "False"
+        valid_login = False
         invalid_login_window = Tk()
         invalid_login_window.attributes("-topmost", True)
         Label(invalid_login_window, text="Invalid Log In").pack()
@@ -238,11 +239,13 @@ def main():
                                                                                                      column=0,
                                                                                                      columnspan=1)
         # display functionality widgets at bottom of page
-        Button(main_window, text="Enter New Job", command=on_click_new_job, anchor=W).grid(sticky=W, row=2, column=0,
-                                                                                           columnspan=2)
-        Button(main_window, text="Enter New Worker", command=on_click_new_worker, anchor=W).grid(sticky=W, row=3,
-                                                                                                 column=0,
-                                                                                                 columnspan=2)
+        if user_role == 0:
+            Button(main_window, text="Enter New Job", command=on_click_new_job, anchor=W).grid(sticky=W, row=2,
+                                                                                               columnspan=2,
+                                                                                               column=0)
+            Button(main_window, text="Enter New Worker", command=on_click_new_worker, anchor=W).grid(sticky=W, row=3,
+                                                                                                     column=0,
+                                                                                                     columnspan=2)
         Button(main_window, text="Search", command=on_click_new_search, anchor=W).grid(sticky=N, row=2,
                                                                                        column=0, columnspan=2)
         Button(main_window, text="Sort By", command=on_click_new_sort, anchor=W).grid(sticky=N, row=3,
